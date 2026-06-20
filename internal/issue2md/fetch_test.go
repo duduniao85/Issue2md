@@ -1,0 +1,67 @@
+// fetch_test.go 验证 Source 调度（NewSource + Fetch 按 Kind 分发），见 plan.md §6.3。httptest（宪法 2.3）。
+package issue2md
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestNewSource(t *testing.T) {
+	src := NewSource(Options{BaseURL: "http://x"})
+	if src == nil {
+		t.Fatal("NewSource returned nil")
+	}
+}
+
+func TestSourceFetch_IssueDispatch(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/comments") {
+			io.WriteString(w, `[]`)
+			return
+		}
+		io.WriteString(w, `{"title":"T","body":"","state":"open","html_url":"u","number":1,"user":{"login":"a"},"labels":[],`+
+			restReactionsZero+`,"created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`)
+	}))
+	defer srv.Close()
+
+	src := NewSource(Options{BaseURL: srv.URL})
+	doc, err := src.Fetch(context.Background(), Ref{KindIssue, "o", "r", 1})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if doc.Kind != KindIssue {
+		t.Errorf("Kind = %v, want KindIssue", doc.Kind)
+	}
+	if !strings.Contains(gotPath, "/issues/") {
+		t.Errorf("dispatched path = %q, want contains /issues/ (REST)", gotPath)
+	}
+}
+
+func TestSourceFetch_DiscussionDispatch(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, gqlDiscussion(`"nodes":[]`, `{"hasNextPage":false,"endCursor":null}`))
+	}))
+	defer srv.Close()
+
+	src := NewSource(Options{BaseURL: srv.URL})
+	doc, err := src.Fetch(context.Background(), Ref{KindDiscussion, "o", "r", 7})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if doc.Kind != KindDiscussion {
+		t.Errorf("Kind = %v, want KindDiscussion", doc.Kind)
+	}
+	if gotPath != "/graphql" {
+		t.Errorf("dispatched path = %q, want /graphql", gotPath)
+	}
+}

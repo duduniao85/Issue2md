@@ -3,3 +3,11 @@
 .idea/
 *.DS_Store
 /my-issue2md-project
+
+# 构建产物
+/bin/
+
+# Go 测试与覆盖率输出
+*.out
+*.test
+coverage.txt
