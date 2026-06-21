@@ -55,15 +55,7 @@ func localizeImages(ctx context.Context, c *httpClient, md, imageDir, linkPrefix
 
 // downloadImage 直接 GET 绝对图片 URL（host 非 api.github.com），返回 body + 扩展名。
 func downloadImage(ctx context.Context, c *httpClient, url string) ([]byte, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, "", err
-	}
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	req.Header.Set("User-Agent", c.userAgent)
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.send(ctx, requestSpec{method: http.MethodGet, url: url})
 	if err != nil {
 		return nil, "", err
 	}

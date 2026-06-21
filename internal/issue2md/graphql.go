@@ -135,19 +135,14 @@ func postGraphQL(ctx context.Context, c *httpClient, query string, vars map[stri
 	if err != nil {
 		return nil, &Error{Kind: KindServer, Op: "graphql", Message: "encode failed", Cause: err}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/graphql", bytes.NewReader(payload))
+	resp, err := c.send(ctx, requestSpec{
+		method:  http.MethodPost,
+		url:     c.base + "/graphql",
+		body:    bytes.NewReader(payload),
+		headers: map[string]string{"Content-Type": "application/json"},
+	})
 	if err != nil {
 		return nil, err
-	}
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", c.userAgent)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, &Error{Kind: KindNetwork, Op: "graphql", Message: "network error", Cause: err}
 	}
 	defer resp.Body.Close()
 	if err := checkStatus(resp); err != nil {

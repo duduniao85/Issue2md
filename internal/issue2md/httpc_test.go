@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestNewHTTPClient(t *testing.T) {
@@ -40,7 +41,10 @@ func TestBuildRequest_Headers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := newHTTPClient(Options{Token: tt.token, BaseURL: "http://example.test"})
-			req, err := c.buildRequest(context.Background(), http.MethodGet, "/repos/o/r/issues/1")
+			req, err := c.buildRequest(context.Background(), requestSpec{
+				method: http.MethodGet,
+				url:    "http://example.test/repos/o/r/issues/1",
+			})
 			if err != nil {
 				t.Fatalf("buildRequest err: %v", err)
 			}
@@ -160,5 +164,23 @@ func TestDo_CheckStatus_EndToEnd(t *testing.T) {
 	defer resp.Body.Close()
 	if err := checkStatus(resp); !errors.Is(err, ErrNotFound) {
 		t.Errorf("checkStatus(404) = %v, want errors.Is(ErrNotFound)", err)
+	}
+}
+
+// TestDo_Timeout 验证 Options.Timeout 生效（零值默认 30s；此处显式设短超时）。
+// 服务端故意延迟响应，超时后请求应映射为 KindNetwork（宪法 §3.1：文档承诺须与实现一致）。
+func TestDo_Timeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(300 * time.Millisecond) // 远大于客户端超时
+	}))
+	defer srv.Close()
+
+	c := newHTTPClient(Options{BaseURL: srv.URL, Timeout: 50 * time.Millisecond})
+	_, err := c.do(context.Background(), http.MethodGet, "/repos/o/r/issues/1")
+	if err == nil {
+		t.Fatal("do() err = nil, want non-nil (timeout)")
+	}
+	if !errors.Is(err, ErrNetwork) {
+		t.Errorf("do() err = %v, want errors.Is(ErrNetwork)", err)
 	}
 }

@@ -28,7 +28,7 @@ type frontMatter struct {
 
 // quoteYAML 将字符串用双引号包裹并转义特殊字符（YAML 双引号字符串）。
 func quoteYAML(s string) string {
-	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\t", `\t`)
+	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\r", `\r`, "\t", `\t`)
 	return `"` + r.Replace(s) + `"`
 }
 

@@ -141,3 +141,21 @@ func TestFetchIssue_NotFound(t *testing.T) {
 		t.Errorf("fetchIssue(404) err = %v, want errors.Is(ErrNotFound)", err)
 	}
 }
+
+// TestListComments_MalformedNextLink 验证：Link 头里 rel="next" 的 URL 无法解析时，
+// 不再静默 break 丢失后续评论，而是显式返回错误（宪法 §3.1 显式处理）。
+func TestListComments_MalformedNextLink(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// 非法 URL（无效百分号转义）使 url.Parse 失败
+		w.Header().Set("Link", `<http://a/%zz>; rel="next"`)
+		io.WriteString(w, `[]`)
+	}))
+	defer srv.Close()
+
+	c := newHTTPClient(Options{BaseURL: srv.URL})
+	_, err := listComments(context.Background(), c, Ref{KindIssue, "o", "r", 1})
+	if err == nil {
+		t.Fatal("listComments(非法 next link) err = nil, want non-nil")
+	}
+}
