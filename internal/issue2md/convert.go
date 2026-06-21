@@ -43,6 +43,7 @@ func Convert(ctx context.Context, src string, opts Options) (*Result, error) {
 		return nil, err
 	}
 	doc.FetchedAt = time.Now()
+	// 复用 source 内的同一个 httpClient 下载图片（避免重复构造两份 client）。
 
 	md, err := Render(doc)
 	if err != nil {
@@ -65,8 +66,7 @@ func Convert(ctx context.Context, src string, opts Options) (*Result, error) {
 
 	var warnings []string
 	if !opts.NoImages {
-		client := newHTTPClient(opts)
-		md, warnings, err = localizeImages(ctx, client, md, imageDir, linkPrefix)
+		md, warnings, err = localizeImages(ctx, source.c, md, imageDir, linkPrefix)
 		if err != nil {
 			return nil, err
 		}

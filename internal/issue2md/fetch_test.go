@@ -65,3 +65,37 @@ func TestSourceFetch_DiscussionDispatch(t *testing.T) {
 		t.Errorf("dispatched path = %q, want /graphql", gotPath)
 	}
 }
+
+// TestSourceFetch_PullDispatch 验证 KindPull 分发命中 REST /pulls/ 端点（补充分发覆盖）。
+func TestSourceFetch_PullDispatch(t *testing.T) {
+	var sawPulls bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/comments"):
+			io.WriteString(w, `[]`)
+		case strings.Contains(r.URL.Path, "/pulls/"):
+			sawPulls = true
+			io.WriteString(w, `{"merged":false,"base":{"ref":"main"},"head":{"ref":"dev"}}`)
+		default:
+			io.WriteString(w, `{"title":"PT","body":"","state":"open","html_url":"u","number":2,"user":{"login":"a"},"labels":[],`+
+				restReactionsZero+`,"created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`)
+		}
+	}))
+	defer srv.Close()
+
+	src := NewSource(Options{BaseURL: srv.URL})
+	doc, err := src.Fetch(context.Background(), Ref{KindPull, "o", "r", 2})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if doc.Kind != KindPull {
+		t.Errorf("Kind = %v, want KindPull", doc.Kind)
+	}
+	if !sawPulls {
+		t.Error("dispatched path 缺少 /pulls/（PR 未走 REST pulls 端点）")
+	}
+	if doc.PR == nil || doc.PR.Base != "main" {
+		t.Errorf("PR = %+v, want Base=main", doc.PR)
+	}
+}

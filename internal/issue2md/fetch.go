@@ -4,16 +4,6 @@ package issue2md
 
 import "context"
 
-// githubSource 是 Source 的默认实现。
-type githubSource struct {
-	c *httpClient
-}
-
-// NewSource 构造默认数据源（封装 REST + GraphQL 共用的 httpc 客户端）。
-func NewSource(opts Options) Source {
-	return &githubSource{c: newHTTPClient(opts)}
-}
-
 // Fetch 按 ref.Kind 分发：Issue/PR→REST，Discussion→GraphQL。
 func (s *githubSource) Fetch(ctx context.Context, ref Ref) (*Document, error) {
 	switch ref.Kind {

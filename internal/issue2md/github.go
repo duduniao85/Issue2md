@@ -160,7 +160,8 @@ func listComments(ctx context.Context, c *httpClient, ref Ref) ([]Comment, error
 		}
 		u, err := url.Parse(next)
 		if err != nil {
-			break
+			return nil, &Error{Kind: KindServer, Op: "fetch comments",
+				Message: "parse next link failed: " + next, Cause: err}
 		}
 		listURL = u.RequestURI() // path?query，重新基于 baseURL 请求
 	}
